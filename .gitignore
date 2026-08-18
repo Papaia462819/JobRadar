@@ -1,0 +1,22 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Databases (created at runtime)
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+dist/
+*.local
+
+# Editors / OS
+.idea/
+.DS_Store
+
+# Secrets — put real Adzuna keys in appsettings.Local.json (gitignored) or user-secrets
+appsettings.Local.json
