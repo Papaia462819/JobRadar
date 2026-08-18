@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 
 namespace JobRadar.Api.Fetching;
@@ -18,7 +19,7 @@ public sealed class ArbeitnowOptions
 /// <summary>
 /// Arbeitnow job board API — free, no auth: https://www.arbeitnow.com/api/job-board-api
 /// </summary>
-public sealed class ArbeitnowFetcher(
+public sealed partial class ArbeitnowFetcher(
     HttpClient http,
     IOptions<ArbeitnowOptions> options,
     ILogger<ArbeitnowFetcher> logger) : IJobFetcher
@@ -32,7 +33,7 @@ public sealed class ArbeitnowFetcher(
         "c#", "java", "python", "php", "javascript", "typescript", "react", "angular",
         "vue", "node", "backend", "back-end", "frontend", "front-end", "full stack",
         "fullstack", "full-stack", "qa", "tester", "testing", "data", "cloud", "sre",
-        "mobile", "android", "ios", "web", "it "
+        "mobile", "android", "ios", "web"
     ];
 
     public string SourceName => "Arbeitnow";
@@ -105,8 +106,17 @@ public sealed class ArbeitnowFetcher(
     {
         var haystack = $"{item.Title} {string.Join(' ', item.Tags ?? [])} {string.Join(' ', item.JobTypes ?? [])}"
             .ToLowerInvariant();
-        return TechTerms.Any(haystack.Contains);
+        if (TechTerms.Any(haystack.Contains))
+            return true;
+
+        // "IT" only counts as a whole word — as a substring it matches half the
+        // German dictionary ("arbeit", "mit", "zeit") and lets marketing/sales
+        // listings through.
+        return ItWordRegex().IsMatch(haystack);
     }
+
+    [GeneratedRegex(@"\bit\b")]
+    private static partial Regex ItWordRegex();
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
@@ -126,9 +136,11 @@ public sealed class ArbeitnowFetcher(
         [property: JsonPropertyName("created_at")] long CreatedAt);
 
     /// <summary>
-    /// The Arbeitnow feed sometimes sends "job_types": "full_time" (a bare
-    /// string) instead of an array — accept a string, an array (skipping
-    /// non-string elements), or anything else (treated as empty).
+    /// The Arbeitnow feed is inconsistent about "job_types"/"tags": usually an
+    /// array, but sometimes a bare string or a PHP-style map like
+    /// {"1": "professional / experienced"}. Accept all three (collecting the
+    /// string values) and treat anything else as empty instead of failing the
+    /// whole source.
     /// </summary>
     private sealed class LenientStringListConverter : JsonConverter<List<string>>
     {
@@ -149,6 +161,19 @@ public sealed class ArbeitnowFetcher(
                             reader.Skip();
                     }
                     return list;
+
+                case JsonTokenType.StartObject:
+                    var fromObject = new List<string>();
+                    while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+                    {
+                        // PropertyName token; the next token is its value.
+                        reader.Read();
+                        if (reader.TokenType == JsonTokenType.String)
+                            fromObject.Add(reader.GetString()!);
+                        else
+                            reader.Skip();
+                    }
+                    return fromObject;
 
                 default:
                     reader.Skip();

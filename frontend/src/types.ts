@@ -70,18 +70,20 @@ export type SortMode = 'newest' | 'relevance';
 
 export interface Filters {
   state: InteractionState | 'all';
-  source: string;
+  /** Empty array = all sources. */
+  sources: string[];
   place: Place;
-  language: string;
+  /** Empty array = all languages. */
+  languages: string[];
   q: string;
   sort: SortMode;
 }
 
 export const DEFAULT_FILTERS: Filters = {
   state: 'all',
-  source: 'all',
+  sources: [],
   place: 'all',
-  language: 'all',
+  languages: [],
   q: '',
   sort: 'newest',
 };

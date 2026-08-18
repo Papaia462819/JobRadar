@@ -28,9 +28,9 @@ export function getJobs(filters: Filters, forBoard = false): Promise<JobListResp
   // Board view shows every state as a column, so the state filter only
   // applies in list view.
   if (!forBoard && filters.state !== 'all') params.set('state', filters.state);
-  if (filters.source !== 'all') params.set('source', filters.source);
+  if (filters.sources.length > 0) params.set('source', filters.sources.join(','));
   if (filters.place !== 'all') params.set('place', filters.place);
-  if (filters.language !== 'all') params.set('language', filters.language);
+  if (filters.languages.length > 0) params.set('language', filters.languages.join(','));
   if (filters.q.trim()) params.set('q', filters.q.trim());
   params.set('sort', filters.sort);
   params.set('take', '300');

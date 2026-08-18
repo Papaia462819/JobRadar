@@ -2,6 +2,7 @@ import { LayoutGrid, List, Search } from 'lucide-react';
 import type { Filters, InteractionState, Place, SortMode } from '../types';
 import { INTERACTION_STATES } from '../types';
 import { STATE_META } from '../lib/states';
+import MultiSelect from './MultiSelect';
 
 interface Props {
   filters: Filters;
@@ -71,21 +72,23 @@ export default function FiltersBar({ filters, query, sources, view, onQueryChang
         ))}
       </select>
 
-      <select value={filters.source} onChange={(e) => onChange({ source: e.target.value })} className={selectCls}>
-        <option value="all">All sources</option>
-        {sources.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
+      <MultiSelect
+        allLabel="All sources"
+        options={sources.map((s) => ({ value: s, label: s }))}
+        selected={filters.sources}
+        onChange={(next) => onChange({ sources: next })}
+      />
 
-      <select value={filters.language} onChange={(e) => onChange({ language: e.target.value })} className={selectCls}>
-        <option value="all">All languages</option>
-        <option value="ro">Română</option>
-        <option value="en">English</option>
-        <option value="de">Deutsch</option>
-      </select>
+      <MultiSelect
+        allLabel="All languages"
+        options={[
+          { value: 'ro', label: 'Română' },
+          { value: 'en', label: 'English' },
+          { value: 'de', label: 'Deutsch' },
+        ]}
+        selected={filters.languages}
+        onChange={(next) => onChange({ languages: next })}
+      />
 
       <select value={filters.sort} onChange={(e) => onChange({ sort: e.target.value as SortMode })} className={selectCls}>
         <option value="newest">Newest first</option>

@@ -36,6 +36,7 @@ builder.Services.AddDbContext<JobDbContext>(options =>
 });
 
 // --- Options ------------------------------------------------------------------
+builder.Services.Configure<ScanOptions>(builder.Configuration.GetSection("Scan"));
 builder.Services.Configure<ProfileOptions>(builder.Configuration.GetSection("Profile"));
 builder.Services.Configure<AdzunaOptions>(builder.Configuration.GetSection("Adzuna"));
 builder.Services.Configure<ArbeitnowOptions>(builder.Configuration.GetSection("Arbeitnow"));
@@ -104,7 +105,32 @@ var app = builder.Build();
 // Auto-apply EF migrations so the DB "just works" on first run.
 using (var scope = app.Services.CreateScope())
 {
-    scope.ServiceProvider.GetRequiredService<JobDbContext>().Database.Migrate();
+    var db = scope.ServiceProvider.GetRequiredService<JobDbContext>();
+    db.Database.Migrate();
+
+    // Repair pass: rows scanned before the HtmlToText decode-order fix still
+    // hold raw/encoded HTML in their descriptions. Re-cleaning is idempotent,
+    // so rows that are already plain text are left untouched.
+    var suspects = db.Jobs
+        .Where(j => j.Description.Contains("</") || j.Description.Contains("&lt;") ||
+                    j.Description.Contains("&nbsp;") || j.Description.Contains("<div") ||
+                    j.Description.Contains("<p>"))
+        .ToList();
+    var repaired = 0;
+    foreach (var jobRow in suspects)
+    {
+        var cleaned = TextUtils.HtmlToText(jobRow.Description);
+        if (cleaned != jobRow.Description)
+        {
+            jobRow.Description = cleaned;
+            repaired++;
+        }
+    }
+    if (repaired > 0)
+    {
+        db.SaveChanges();
+        app.Logger.LogInformation("Re-cleaned HTML out of {Count} stored job descriptions", repaired);
+    }
 
     // Daily scan at 08:00 local time (cron configurable via "Scan:Cron").
     scope.ServiceProvider.GetRequiredService<IRecurringJobManager>().AddOrUpdate<ScanService>(
